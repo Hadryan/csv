@@ -19,6 +19,7 @@ use CallbackFilterIterator;
 use Countable;
 use Iterator;
 use IteratorAggregate;
+use JsonSerializable;
 use League\Csv\Exception\RuntimeException;
 use SplFileObject;
 
@@ -33,19 +34,12 @@ use SplFileObject;
  * @method Generator fetchColumn(string|int $column_index) Returns the next value from a single CSV record field
  * @method Generator fetchPairs(string|int $offset_index, string|int $value_index) Fetches the next key-value pairs from the CSV document
  */
-class Reader extends AbstractCsv implements Countable, IteratorAggregate
+class Reader extends AbstractCsv implements Countable, IteratorAggregate, JsonSerializable
 {
     /**
      * @inheritdoc
      */
     protected $stream_filter_mode = STREAM_FILTER_READ;
-
-    /**
-     * The value to pad if the record is less than header size.
-     *
-     * @var mixed
-     */
-    protected $record_padding_value;
 
     /**
      * CSV Document header offset
@@ -67,16 +61,6 @@ class Reader extends AbstractCsv implements Countable, IteratorAggregate
      * @var int
      */
     protected $nb_records = -1;
-
-    /**
-     * Returns the record padding value
-     *
-     * @return mixed
-     */
-    public function getRecordPaddingValue()
-    {
-        return $this->record_padding_value;
-    }
 
     /**
      * Returns the record offset used as header
@@ -195,6 +179,14 @@ class Reader extends AbstractCsv implements Countable, IteratorAggregate
     }
 
     /**
+     * @inheritdoc
+     */
+    public function jsonSerialize(): array
+    {
+        return iterator_to_array($this->getRecords(), false);
+    }
+
+    /**
      * Returns the CSV records in an iterator object.
      *
      * Each CSV record is represented as a simple array of string or null values.
@@ -269,7 +261,7 @@ class Reader extends AbstractCsv implements Countable, IteratorAggregate
         $field_count = count($header);
         $mapper = function (array $record) use ($header, $field_count): array {
             if (count($record) != $field_count) {
-                $record = array_slice(array_pad($record, $field_count, $this->record_padding_value), 0, $field_count);
+                $record = array_slice(array_pad($record, $field_count, null), 0, $field_count);
             }
 
             return array_combine($header, $record);
@@ -302,20 +294,6 @@ class Reader extends AbstractCsv implements Countable, IteratorAggregate
         };
 
         return new MapIterator($iterator, $mapper);
-    }
-
-    /**
-     * Set the record padding value
-     *
-     * @param mixed $record_padding_value
-     *
-     * @return static
-     */
-    public function setRecordPaddingValue($record_padding_value): self
-    {
-        $this->record_padding_value = $record_padding_value;
-
-        return $this;
     }
 
     /**
